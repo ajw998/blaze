@@ -1,0 +1,39 @@
+[workspace.package]
+name = "blaze"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+resolver = "3"
+members = [ 
+	"crates/cli",
+	"crates/engine",
+	"crates/fs",
+	"crates/protocol",
+	"crates/runtime",
+]
+
+[workspace.dependencies]
+anyhow = "1.0.100"
+bitflags = "2.10.0"
+bytemuck = { version = "1", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+crossbeam = "0.8"
+dirs = "6.0.0"
+log = "0.4.28"
+serde_json = "1.0" 
+serde = { version = "1.0", features = ["derive"] }
+serial_test = "3.2.0"
+tempfile = "3.23.0"
+blaze-fs = { path = "crates/fs" }
+blaze-runtime = { path = "crates/runtime" }
+blaze-engine = { path = "crates/engine" }
+blaze-cli = { path = "crates/cli" }
+ignore = "0.4.25"
+hashbrown = "0.15"
+memmap2 = "0.9"
+smallvec = "1.13"
+crc32fast = "1.4"
+
+[workspace.dev-dependencies]
+criterion = "0.7"

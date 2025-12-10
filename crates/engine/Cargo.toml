@@ -1,0 +1,16 @@
+[package]
+name = "blaze-engine"
+edition = "2024"
+
+[dependencies]
+bitflags = { workspace = true }
+bytemuck = { workspace = true }
+chrono = { workspace = true }
+hashbrown = { workspace = true }
+smallvec = { workspace = true }
+blaze-fs = { workspace = true }
+blaze-runtime = { workspace = true }
+memmap2 = { workspace = true }
+log = { workspace = true }
+tempfile = { workspace = true }
+crc32fast = { workspace = true }

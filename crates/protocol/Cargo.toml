@@ -1,0 +1,3 @@
+[package]
+name = "blaze-protocol"
+edition = "2024"

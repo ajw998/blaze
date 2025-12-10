@@ -1,0 +1,13 @@
+[package]
+name = "blaze-fs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitflags = { workspace = true }
+crossbeam = { workspace = true }
+log = { workspace = true }
+dirs = { workspace = true }
+ignore = { workspace = true }
+tempfile = { workspace = true }
+blaze-runtime = { workspace = true }

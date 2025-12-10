@@ -1,0 +1,18 @@
+[package]
+name = "blaze-cli"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { version = "4.5.53", features = ["derive"]}
+log = { workspace = true }
+blaze-engine = { workspace = true }
+blaze-runtime = { workspace = true }
+blaze-fs = { workspace = true }
+serde_json = {workspace = true}
+crossbeam = { workspace = true }
+
+[[bin]]
+name = "blaze"
+path = "src/main.rs"
