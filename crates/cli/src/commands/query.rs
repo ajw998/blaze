@@ -1,7 +1,12 @@
+use blaze_protocol::codec::{read_message, write_message};
+use blaze_runtime::blaze_dir;
 use std::io::{Stderr, Stdout};
+use std::os::unix::net::UnixStream;
 use std::process::ExitCode;
 
-use blaze_engine::{Index, QueryPipeline};
+use anyhow::{Context, anyhow};
+use blaze_engine::{Index, PipelineMetrics, to_query_metrics};
+use blaze_protocol::{DaemonRequest, DaemonResponse, QueryRequest};
 use blaze_runtime::default_index_path;
 use clap::Args;
 
@@ -67,6 +72,10 @@ pub struct QueryArgs {
     /// Output formatting options
     #[command(flatten)]
     pub output: OutputOptions,
+
+    /// Use the background daemon instead of querying index directly
+    #[arg(long)]
+    pub daemon: bool,
 }
 
 pub fn run(args: QueryArgs) -> ExitCode {
@@ -80,55 +89,112 @@ pub fn run(args: QueryArgs) -> ExitCode {
 }
 
 fn execute(args: QueryArgs) -> CommandResult<ExitCode> {
-    // Locate the index file and open it.
-    //
-    // `Index::open` returns an io::Result, but CommandResult is an anyhow::Result,
-    // so `?` will convert the io::Error into anyhow::Error for us.
+    if args.daemon {
+        execute_via_daemon(&args)
+    } else {
+        execute_local(args)
+    }
+}
+
+/// Existing behaviour: open index and run pipeline in-process.
+fn execute_local(args: QueryArgs) -> CommandResult<ExitCode> {
     let index_path = default_index_path();
     let index = Index::open(&index_path)?;
 
-    run_query(&index, &args)?;
+    run_local(&index, &args)?;
 
     Ok(ExitCode::from(0))
 }
 
-fn run_query(index: &Index, args: &QueryArgs) -> CommandResult<()> {
-    // Build and execute the timed query pipeline.
-    //
-    // This gives us a fully ranked pipeline with metrics.
-    let pipeline = QueryPipeline::new_timed(index)
-        .parse(&args.query)
-        .execute()
-        .rank_with_limit(Some(args.limit));
+fn run_local(index: &Index, args: &QueryArgs) -> CommandResult<()> {
+    let limit = args.limit;
+    let result = index.run_query(&args.query, limit);
 
-    // Let the output options decide which printer to use.
-    let mut printer = args.output.make_printer(args.limit);
+    let mut printer = args.output.make_printer(limit);
 
-    // Compute basic context for printing.
-    let total = pipeline.count();
-    let truncated = total > args.limit;
-    let metrics = pipeline.metrics();
-    let query_str = pipeline.query_str();
+    let truncated = result.total > limit;
+
+    let metrics = result
+        .metrics
+        .map(|m: PipelineMetrics| to_query_metrics(&m));
 
     let ctx = QueryPrintContext {
         kind: "query",
-        query: query_str,
-        total,
+        query: result.query_str.as_deref(),
+        total: result.total,
         truncated,
         metrics,
     };
 
     printer.begin(&ctx)?;
 
-    for (rank, _fid, path) in pipeline.iter_with_paths() {
-        let row = QueryRow { rank, path: &path };
+    for hit in &result.hits {
+        let row = QueryRow {
+            rank: hit.rank,
+            path: &hit.path,
+        };
         printer.print_row(&row, &ctx)?;
     }
 
-    // Finish printing (footer / summary / timing).
     printer.finish(&ctx)?;
 
-    pipeline.log_history();
-
     Ok(())
+}
+
+/// Daemon mode: send the query over Unix socket and print the response.
+fn execute_via_daemon(args: &QueryArgs) -> CommandResult<ExitCode> {
+    let socket_path = blaze_dir().join("daemon.sock");
+
+    let mut stream = UnixStream::connect(&socket_path).with_context(|| {
+        format!(
+            "failed to connect to blaze daemon at {}",
+            socket_path.display()
+        )
+    })?;
+
+    let req = DaemonRequest::Query(QueryRequest {
+        query: args.query.clone(),
+        limit: Some(args.limit),
+    });
+
+    write_message(&mut stream, &req)?;
+    let resp: DaemonResponse = read_message(&mut stream)?;
+
+    match resp {
+        DaemonResponse::QueryResult(qr) => {
+            // Reuse the existing printers.
+            let mut printer = args.output.make_printer(args.limit);
+
+            let total = qr.total as usize;
+            let truncated = total > args.limit;
+
+            let ctx = QueryPrintContext {
+                kind: "query",
+                query: Some(&args.query),
+                total,
+                truncated,
+                metrics: qr.metrics,
+            };
+
+            printer.begin(&ctx)?;
+
+            for hit in qr.hits.iter().take(args.limit) {
+                let row = QueryRow {
+                    rank: hit.rank as usize,
+                    path: &hit.path,
+                };
+                printer.print_row(&row, &ctx)?;
+            }
+
+            printer.finish(&ctx)?;
+
+            // History logging is already done in the daemon's pipeline.
+            Ok(ExitCode::from(0))
+        }
+        DaemonResponse::Error(msg) => {
+            // Treat daemon-reported error as a CLI error.
+            Err(anyhow!("daemon error: {msg}").into())
+        }
+        other => Err(anyhow!("unexpected daemon response: {other:?}").into()),
+    }
 }

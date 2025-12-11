@@ -23,7 +23,7 @@ pub const INDEX_MAGIC: u32 = 0x455A4C42;
 
 pub const INDEX_VERSION: u32 = 1;
 
-/// Align `value` up to the next multiple of `alignment` 
+/// Align `value` up to the next multiple of `alignment`
 #[inline]
 fn align_up(value: u64, alignment: u64) -> u64 {
     debug_assert!(alignment.is_power_of_two());

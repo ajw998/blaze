@@ -1,4 +1,4 @@
-use blaze_engine::PipelineMetrics;
+use blaze_protocol::QueryMetrics;
 use std::io::{self, Write};
 
 /// Trait for writing status messages (daemon, indexing progress, etc).
@@ -20,16 +20,6 @@ impl StatusWriter for StderrWriter {
 #[derive(Default)]
 pub struct BufferedWriter {
     buf: Vec<String>,
-}
-
-impl BufferedWriter {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn lines(&self) -> &[String] {
-        &self.buf
-    }
 }
 
 impl StatusWriter for BufferedWriter {
@@ -103,28 +93,6 @@ pub struct HumanPrinter<W: Write, E: Write> {
 }
 
 impl<W: Write, E: Write> HumanPrinter<W, E> {
-    pub fn new(out: W, err: E, cfg: PrinterConfig) -> Self {
-        let use_color = match cfg.color {
-            ColorChoice::Always => true,
-            ColorChoice::Never => false,
-            ColorChoice::Auto => {
-                // Use std::io::IsTerminal for TTY detection
-                // Since we're generic over W, we can't check directly.
-                // The caller should set ColorChoice::Always/Never explicitly
-                // if they need precise control, or we default to no color
-                // when Auto is used with non-stdout writers.
-                false
-            }
-        };
-
-        Self {
-            out,
-            err,
-            cfg,
-            use_color,
-        }
-    }
-
     /// Create a printer that writes to stdout and stderr with TTY detection.
     pub fn stdout(cfg: PrinterConfig) -> HumanPrinter<io::Stdout, io::Stderr> {
         use std::io::IsTerminal;
@@ -160,10 +128,6 @@ pub struct JsonPrinter<W: Write, E: Write> {
 }
 
 impl<W: Write, E: Write> JsonPrinter<W, E> {
-    pub fn new(out: W, err: E, cfg: PrinterConfig) -> Self {
-        Self { out, err, cfg }
-    }
-
     /// Create a printer that writes to stdout and stderr.
     pub fn stdout(cfg: PrinterConfig) -> JsonPrinter<io::Stdout, io::Stderr> {
         JsonPrinter {
@@ -186,7 +150,7 @@ pub struct QueryPrintContext<'a> {
     /// Whether output was truncated due to limit.
     pub truncated: bool,
     /// Optional timing metrics.
-    pub metrics: Option<&'a PipelineMetrics>,
+    pub metrics: Option<QueryMetrics>,
 }
 
 /// One row in the result stream.
@@ -238,20 +202,16 @@ impl<W: Write, E: Write> QueryPrinter for HumanPrinter<W, E> {
         }
 
         if self.cfg.show_timing
-            && let Some(m) = ctx.metrics
+            && let Some(m) = &ctx.metrics
         {
-            let total = m.total();
-            let exec = m.exec_time.unwrap_or_default();
-            let rank = m.rank_time.unwrap_or_default();
+            let total = m.total_ms;
+            let exec = m.exec_ms;
+            let rank = m.rank_ms;
 
             writeln!(
                 self.err,
                 "\n[{}] {} results in {:.2}ms (exec: {:.2}ms, rank: {:.2}ms)",
-                ctx.kind,
-                ctx.total,
-                total.as_secs_f64() * 1000.0,
-                exec.as_secs_f64() * 1000.0,
-                rank.as_secs_f64() * 1000.0,
+                ctx.kind, ctx.total, total, exec, rank,
             )?;
         }
 
@@ -276,7 +236,7 @@ impl<W: Write, E: Write> QueryPrinter for JsonPrinter<W, E> {
 
     fn finish(&mut self, ctx: &QueryPrintContext) -> io::Result<()> {
         if self.cfg.show_timing
-            && let Some(m) = ctx.metrics
+            && let Some(m) = &ctx.metrics
         {
             let obj = serde_json::json!({
                 "type": "summary",
@@ -285,9 +245,9 @@ impl<W: Write, E: Write> QueryPrinter for JsonPrinter<W, E> {
                 "total": ctx.total,
                 "truncated": ctx.truncated,
                 "timing_ms": {
-                    "total": m.total().as_secs_f64() * 1000.0,
-                    "exec": m.exec_time.unwrap_or_default().as_secs_f64() * 1000.0,
-                    "rank": m.rank_time.unwrap_or_default().as_secs_f64() * 1000.0,
+                    "total": m.total_ms,
+                    "exec": m.exec_ms,
+                    "rank": m.rank_ms
                 }
             });
             writeln!(self.err, "{}", obj)?;

@@ -1,0 +1,10 @@
+[package]
+name = "blaze-indexer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+crossbeam = { workspace = true }
+blaze-engine = { workspace = true }
+blaze-fs = { workspace = true }

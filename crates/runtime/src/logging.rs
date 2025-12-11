@@ -1,5 +1,4 @@
-use std::sync::{Mutex, OnceLock};
-use std::{fs::File, io::Write};
+use std::sync::OnceLock;
 
 use chrono::Local;
 use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
@@ -8,7 +7,6 @@ use crate::config::PROGRAM_LOG_LEVEL;
 
 enum LogTarget {
     Stderr,
-    File(Mutex<File>),
 }
 
 pub struct Logger {
@@ -36,23 +34,11 @@ impl Log for Logger {
                 LogTarget::Stderr => {
                     eprintln!("{msg}")
                 }
-                LogTarget::File(file) => {
-                    if let Ok(mut file) = file.lock() {
-                        writeln!(file, "{msg}").ok();
-                        file.flush().ok();
-                    }
-                }
             }
         }
     }
 
-    fn flush(&self) {
-        if let LogTarget::File(file) = &self.target
-            && let Ok(mut file) = file.lock()
-        {
-            file.flush().ok();
-        }
-    }
+    fn flush(&self) {}
 }
 
 fn get_level_from_env() -> Level {

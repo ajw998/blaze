@@ -8,10 +8,13 @@ ROOT="${1:-$HOME}"
 WARMUP_RUNS="${WARMUP_RUNS:-3}"
 MEASURE_RUNS="${MEASURE_RUNS:-10}"
 EXPORT_MD="${EXPORT_MD:-}"
-BLAZE_BIN="${BLAZE_BIN:-$REPO_ROOT/target/release/blaze}"
 
-# Sanity checks
-for cmd in hyperfine fdfind find; do
+BLAZE_BIN="${BLAZE_BIN:-$REPO_ROOT/target/release/blaze}"
+BLAZE_CLI_CMD="${BLAZE_CLI_CMD:-$BLAZE_BIN query %q}"
+BLAZE_DAEMON_CMD="${BLAZE_DAEMON_CMD:-$BLAZE_BIN query --daemon %q}"
+
+# Sanity checks (required tools)
+for cmd in hyperfine fdfind find plocate; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "error: '$cmd' not found on PATH" >&2
     exit 1
@@ -30,16 +33,23 @@ if [ ! -d "$ROOT" ]; then
 fi
 
 echo "Benchmarking on ROOT: $ROOT"
-echo "Using blaze binary:   $BLAZE_BIN"
-echo "Warmup runs:          $WARMUP_RUNS, measured runs: $MEASURE_RUNS"
+echo "Using blaze binary:        $BLAZE_BIN"
+echo "Blaze CLI template:        $BLAZE_CLI_CMD"
+echo "Blaze daemon template:     $BLAZE_DAEMON_CMD"
+echo "Warmup runs:               $WARMUP_RUNS, measured runs: $MEASURE_RUNS"
 echo
 
-# Queries to benchmark
 QUERIES=(
   "Cargo.toml" # rare-ish filename
-  "config" # common dev term
-  "src" # path substring that hits many paths
+  "config"     # common dev term
+  "src"        # path substring that hits many paths
 )
+
+expand_cmd() {
+  local template="$1"
+  local query="$2"
+  printf '%s' "${template//%q/$query}"
+}
 
 # Run benchmarks
 for q in "${QUERIES[@]}"; do
@@ -47,23 +57,39 @@ for q in "${QUERIES[@]}"; do
   echo "Query: '$q'"
   echo "============================================================"
 
-  CMD_BLAZE="$BLAZE_BIN query \"$q\""
-  CMD_FD="fdfind $q $ROOT"
-  CMD_FIND="find $ROOT -iname \"*$q*\""
+  CMD_BLAZE_CLI="$(expand_cmd "$BLAZE_CLI_CMD" "$q")"
+  CMD_BLAZE_DAEMON="$(expand_cmd "$BLAZE_DAEMON_CMD" "$q")"
 
-  echo "blaze: $CMD_BLAZE"
-  echo "fd:    $CMD_FD"
-  echo "find:  $CMD_FIND"
+  # Competitors
+  CMD_FDFIND="fdfind \"$q\" \"$ROOT\""
+  CMD_FIND="find \"$ROOT\" -iname \"*$q*\""
+  CMD_PLOCATE="plocate \"$q\""
+
+  echo "blaze (CLI):    $CMD_BLAZE_CLI"
+  echo "blaze (daemon): $CMD_BLAZE_DAEMON"
+  echo "fdfind:         $CMD_FDFIND"
+  echo "find:           $CMD_FIND"
+  echo "plocate:        $CMD_PLOCATE"
   echo
+
+  # Build the hyperfine command list dynamically
+  CMDS=(
+    "$CMD_BLAZE_CLI"
+    "$CMD_BLAZE_DAEMON"
+    "$CMD_FDFIND"
+  )
+
+  CMDS+=(
+    "$CMD_FIND"
+    "$CMD_PLOCATE"
+  )
 
   if [ -n "$EXPORT_MD" ]; then
     TMP_MD="$(mktemp)"
     hyperfine \
       --warmup "$WARMUP_RUNS" \
       --runs "$MEASURE_RUNS" \
-      "$CMD_BLAZE" \
-      "$CMD_FD" \
-      "$CMD_FIND" \
+      "${CMDS[@]}" \
       --export-markdown "$TMP_MD"
 
     {
@@ -78,9 +104,7 @@ for q in "${QUERIES[@]}"; do
     hyperfine \
       --warmup "$WARMUP_RUNS" \
       --runs "$MEASURE_RUNS" \
-      "$CMD_BLAZE" \
-      "$CMD_FD" \
-      "$CMD_FIND"
+      "${CMDS[@]}"
   fi
 
   echo
@@ -89,4 +113,3 @@ done
 if [ -n "$EXPORT_MD" ]; then
   echo "Markdown results written to: $EXPORT_MD"
 fi
-

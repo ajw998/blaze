@@ -1,8 +1,5 @@
 use super::*;
 use log::{Level, Metadata, Record};
-use std::fs::File;
-use std::sync::Mutex;
-use tempfile::tempdir;
 
 #[test]
 fn get_level_from_env_parses_cases() {
@@ -71,65 +68,6 @@ fn enabled_respects_level_threshold() {
             );
         }
     }
-}
-
-#[test]
-fn file_logger_expected_format() {
-    let dir = tempdir().expect("create temp dir");
-    let path = dir.path().join("log.txt");
-    let file = File::create(&path).expect("create log file");
-
-    let logger = Logger {
-        level: Level::Info,
-        target: LogTarget::File(Mutex::new(file)),
-    };
-
-    let record = Record::builder()
-        .level(Level::Info)
-        .target("my_target")
-        .args(format_args!("hello world"))
-        .build();
-
-    logger.log(&record);
-    logger.flush();
-
-    let contents = std::fs::read_to_string(&path).expect("read log file");
-
-    assert!(contents.contains("INFO"));
-    assert!(contents.contains("[my_target]"));
-    assert!(contents.contains("hello world"));
-}
-
-#[test]
-fn file_logger_respects_level_filter() {
-    let dir = tempdir().expect("create temp dir");
-    let path = dir.path().join("log.txt");
-    let file = File::create(&path).expect("create log file");
-
-    let logger = Logger {
-        level: Level::Warn,
-        target: LogTarget::File(Mutex::new(file)),
-    };
-
-    // All these are below WARN and should be ignored.
-    let below = [
-        (Level::Info, "info msg"),
-        (Level::Debug, "debug msg"),
-        (Level::Trace, "trace msg"),
-    ];
-
-    for (lvl, msg) in &below {
-        let args = format_args!("{msg}");
-        let record = Record::builder().level(*lvl).target("t").args(args).build();
-        logger.log(&record);
-    }
-    logger.flush();
-
-    let contents = std::fs::read_to_string(&path).expect("read log file");
-    assert!(
-        contents.is_empty(),
-        "no lines should have been written for below-level records, got: {contents:?}"
-    );
 }
 
 #[test]

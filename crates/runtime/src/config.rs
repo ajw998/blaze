@@ -50,11 +50,13 @@ pub fn default_scan_root() -> PathBuf {
     }
 }
 
+pub fn blaze_dir() -> PathBuf {
+    xdg_or_home("XDG_CACHE_HOME", ".cache").join(PROGRAM_NAME)
+}
+
 /// Default index file path
 pub fn default_index_path() -> PathBuf {
-    xdg_or_home("XDG_CACHE_HOME", ".cache")
-        .join(PROGRAM_NAME)
-        .join(INDEX_FILE_NAME)
+    blaze_dir().join(INDEX_FILE_NAME)
 }
 
 /// Default project-relative ignore patterns for common build artifacts, VCS dirs, etc.

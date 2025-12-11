@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use blaze_protocol::QueryMetrics;
 use blaze_runtime::history::{HistoryStore, QueryEvent};
 use chrono::{DateTime, Utc};
 use log::debug;
@@ -427,5 +428,17 @@ impl<'a, I: IndexReader, T: Timer> QueryPipeline<'a, I, RankedState, T> {
         );
 
         history.log_query(event)
+    }
+}
+
+fn dur_ms(d: std::time::Duration) -> f64 {
+    d.as_secs_f64() * 1000.0
+}
+
+pub fn to_query_metrics(m: &PipelineMetrics) -> QueryMetrics {
+    QueryMetrics {
+        total_ms: dur_ms(m.total()),
+        exec_ms: dur_ms(m.exec_time.unwrap()),
+        rank_ms: dur_ms(m.rank_time.unwrap()),
     }
 }
