@@ -11,7 +11,6 @@ pub struct DaemonConfig {
     pub index_path: PathBuf,
     // Unix domain socket path
     pub socket_path: PathBuf,
-    pub deamonize: bool,
 }
 
 fn default_socket_path() -> PathBuf {
@@ -28,10 +27,6 @@ pub struct Cli {
     /// Path to Unix domain socket (optional override)
     #[arg(long)]
     pub socket_path: Option<PathBuf>,
-
-    /// Run in background (detach from terminal).
-    #[arg(long)]
-    pub daemonize: bool,
 }
 
 impl DaemonConfig {
@@ -44,7 +39,6 @@ impl DaemonConfig {
             root,
             index_path,
             socket_path,
-            deamonize: args.daemonize,
         })
     }
 

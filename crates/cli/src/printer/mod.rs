@@ -63,8 +63,6 @@ pub enum ColorChoice {
 /// Configuration for printing query results.
 #[derive(Debug, Clone)]
 pub struct PrinterConfig {
-    /// Output format (human or JSON).
-    pub format: OutputFormat,
     /// Color handling strategy.
     pub color: ColorChoice,
     /// Maximum number of results to print.
@@ -76,7 +74,6 @@ pub struct PrinterConfig {
 impl Default for PrinterConfig {
     fn default() -> Self {
         Self {
-            format: OutputFormat::Human,
             color: ColorChoice::Auto,
             limit: 100,
             show_timing: true,

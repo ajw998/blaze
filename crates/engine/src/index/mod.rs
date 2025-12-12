@@ -9,11 +9,12 @@ use std::{
 use bytemuck::{Pod, Zeroable, cast_slice, from_bytes};
 use memmap2::{Mmap, MmapOptions};
 
-use crate::Trigram;
+use crate::{Trigram, helpers::blob_str};
 
 pub mod builder;
 pub mod compat;
 pub mod flags;
+pub mod helpers;
 pub mod persist;
 pub mod reader;
 
@@ -360,7 +361,7 @@ impl Index {
         &postings[start..end]
     }
 
-    /// Zero-copy *file* trigram lookup.
+    /// Zero-copy file trigram lookup.
     #[inline]
     pub fn query_trigram_on_disk(&self, tri: Trigram) -> Option<&[u32]> {
         let keys = self.trigram_keys();
@@ -395,9 +396,7 @@ impl Index {
     #[inline]
     pub fn get_name(&self, offset: u32, len: u32) -> &str {
         let blob = self.names_blob();
-        let start = offset as usize;
-        let end = start + len as usize;
-        str::from_utf8(&blob[start..end]).unwrap_or("")
+        blob_str(blob, offset, len)
     }
 
     pub fn root_path(&self) -> Option<&str> {
@@ -518,7 +517,6 @@ fn verify_index_header(mmap: &Mmap, header: &IndexHeader) -> io::Result<()> {
         return Err(Error::new(ErrorKind::InvalidData, "index version mismatch"));
     }
 
-    // Now validate each SectionDesc is within file bounds.
     for section in [
         header.metadata,
         header.ext_table,

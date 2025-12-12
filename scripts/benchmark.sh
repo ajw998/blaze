@@ -7,7 +7,6 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT="${1:-$HOME}"
 WARMUP_RUNS="${WARMUP_RUNS:-3}"
 MEASURE_RUNS="${MEASURE_RUNS:-10}"
-EXPORT_MD="${EXPORT_MD:-}"
 
 BLAZE_BIN="${BLAZE_BIN:-$REPO_ROOT/target/release/blaze}"
 BLAZE_CLI_CMD="${BLAZE_CLI_CMD:-$BLAZE_BIN query %q}"
@@ -40,6 +39,7 @@ echo "Warmup runs:               $WARMUP_RUNS, measured runs: $MEASURE_RUNS"
 echo
 
 QUERIES=(
+  "rs"
   "Cargo.toml" # rare-ish filename
   "config"     # common dev term
   "src"        # path substring that hits many paths
@@ -84,32 +84,10 @@ for q in "${QUERIES[@]}"; do
     "$CMD_PLOCATE"
   )
 
-  if [ -n "$EXPORT_MD" ]; then
-    TMP_MD="$(mktemp)"
-    hyperfine \
-      --warmup "$WARMUP_RUNS" \
-      --runs "$MEASURE_RUNS" \
-      "${CMDS[@]}" \
-      --export-markdown "$TMP_MD"
-
-    {
-      echo
-      echo "### Query: \`$q\`"
-      echo
-      cat "$TMP_MD"
-      echo
-    } >> "$EXPORT_MD"
-    rm -f "$TMP_MD"
-  else
-    hyperfine \
-      --warmup "$WARMUP_RUNS" \
-      --runs "$MEASURE_RUNS" \
-      "${CMDS[@]}"
-  fi
+  hyperfine \
+    --warmup "$WARMUP_RUNS" \
+    --runs "$MEASURE_RUNS" \
+    "${CMDS[@]}"
 
   echo
 done
-
-if [ -n "$EXPORT_MD" ]; then
-  echo "Markdown results written to: $EXPORT_MD"
-fi

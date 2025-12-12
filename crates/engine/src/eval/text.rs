@@ -158,7 +158,7 @@ fn eval_text_base_with_state<I: IndexReader>(
 
     // Very short needles or tiny candidate sets: just scan.
     if !state.is_trigram_capable() || candidates.len() <= SMALL_CANDIDATE_CUTOFF {
-        return eval_text_linear_scan_with_paths(index, &state.needle_lower, candidates);
+        return eval_short_text_linear_scan(index, &state.needle_lower, candidates);
     }
 
     let file_count = index.get_file_count();
@@ -214,6 +214,33 @@ fn eval_text_base_with_state<I: IndexReader>(
         // If filename doesn't match, check the full path
         let path = index.reconstruct_full_path(fid);
         if contains_lowercase_ascii(&path, &state.needle_lower) {
+            out.push(fid);
+        }
+    }
+
+    out
+}
+
+/// Evaluate queries that contains 2 or fewer characters
+///
+/// Normally, a user that enters only 2 characters will generally not know
+/// what specifically they are searching for. Instead of using the query as a filter,
+/// we simply return hints.
+fn eval_short_text_linear_scan<I: IndexReader>(
+    index: &I,
+    needle_lower: &str,
+    candidates: &[FileId],
+) -> Vec<FileId> {
+    if needle_lower.is_empty() {
+        return candidates.to_vec();
+    }
+
+    let mut out = Vec::new();
+    out.reserve(candidates.len());
+
+    for &fid in candidates {
+        let name = index.get_file_name(fid);
+        if contains_lowercase_ascii(name, needle_lower) {
             out.push(fid);
         }
     }

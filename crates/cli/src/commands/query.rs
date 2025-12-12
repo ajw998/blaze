@@ -47,7 +47,6 @@ impl OutputOptions {
         };
 
         let cfg = PrinterConfig {
-            format,
             color,
             limit,
             show_timing: !self.quiet,
