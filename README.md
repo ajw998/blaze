@@ -1,5 +1,4 @@
 # Blaze
-
 **Early but usable. Expect breaking changes while the query langauge and CLI settles.**
 
 A *Blaz*ingly fast file searcher.
@@ -26,7 +25,7 @@ Benchmarks were run with [`hyperfine`](https://github.com/sharkdp/hyperfine) on:
 
 Each command was run 3 warmup + 10 measured iterations with warm caches.
 
-### blaze vs `fdfind` vs `find`
+### `blaze` vs `fdfind` vs `find`
 
 Commands:
 
@@ -48,6 +47,8 @@ find "$HOME" -iname "*src*"
 ```
 
 `blaze` is typically **1.7-10x faster** than `fdfind` for common interactive queries, and **~50-230x** faster than `find` once the index has been built.
+
+## Usage
 
 ## License
 MIT

@@ -1,0 +1,17 @@
+[Unit]
+Description=Blaze file search daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/blaze-daemon --foreground
+Restart=on-failure
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
+
