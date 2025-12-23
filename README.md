@@ -21,32 +21,27 @@ Benchmarks were run with [`hyperfine`](https://github.com/sharkdp/hyperfine) on:
 
 - Operating System: PopOS
 - Dataset: `$HOME`
-- blaze: release build with an index prebuilt over `$HOME`
+- blaze: release build with an index prebuilt over `$HOME` (daemon and CLI)
 
 Each command was run 3 warmup + 10 measured iterations with warm caches.
 
-### `blaze` vs `fdfind` vs `find`
+### `blaze` vs `fdfind` vs `find` vs `plocate`
 
-Commands:
+Representative results (mean time, lower is better):
 
-```bash
-# Rareish terms 
-blaze query "Cargo.toml"
-fdfind Cargo.toml "$HOME"
-find "$HOME" -iname "*Cargo.toml*"
+| Query            | blaze (daemon) | blaze (CLI) | fdfind | plocate | find |
+| ---------------- | -------------- | ----------- | ------ | ------- | ---- |
+| `ext:rs`         | 1.4 ms         | 2.0 ms      | 11.1 ms| 18.2 ms | 236.9 ms |
+| `Cargo.toml`     | 0.7 ms         | 0.9 ms      | 9.1 ms | 2.2 ms  | 223.6 ms |
+| `config`         | 1.7 ms         | 2.1 ms      | 10.1 ms| 48.5 ms | 272.6 ms |
+| `src`            | 4.8 ms         | 5.0 ms      | 9.7 ms | 141.9 ms| 252.6 ms |
+| `modified:today` | 0.7 ms         | 1.2 ms      | 10.3 ms| 1125 ms | 359.7 ms |
 
-# Common term 
-blaze query "config"
-fdfind config "$HOME"
-find "$HOME" -iname "*config*"
+Highlights:
 
-# Path substring, expected to return many results 
-blaze query "src"
-fdfind src "$HOME"
-find "$HOME" -iname "*src*"
-```
-
-`blaze` is typically **1.7-10x faster** than `fdfind` for common interactive queries, and **~50-230x** faster than `find` once the index has been built.
+- Daemon mode is **2-15x faster** than `fdfind` and **50-540x faster** than `find`, depending on query selectivity.  
+- Even against `plocate`, blaze holds a **3-30x** advantage on filename/path queries (and **>1000x** on date filters) while providing a richer query language.  
+- Cold-start CLI mode is still **2-10x faster** than `fdfind` and **50-300x faster** than `find`.
 
 ## Usage
 
